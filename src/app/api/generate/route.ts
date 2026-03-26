@@ -5,8 +5,9 @@ import puppeteer from 'puppeteer';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_BASE_URL = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
-const PRIMARY_MODEL = 'minimax/minimax-m2.5:free';
+const PRIMARY_MODEL = 'stepfun/step-3.5-flash:free';
 const FALLBACK_MODEL = process.env.FALLBACK_MODEL || 'nvidia/nemotron-3-super-120b-a12b:free';
+const TERTIARY_MODEL = 'arcee-ai/trinity-large-preview:free';
 
 interface PageData {
   url: string;
@@ -604,34 +605,64 @@ async function callOpenRouter(prompt: string, systemContent: string): Promise<Op
     log('Primary model succeeded');
     return result;
   } catch (error) {
-    if (error instanceof Error && error.message === 'RATE_LIMIT') {
-      log(`Primary model rate limited, trying fallback: ${FALLBACK_MODEL}`);
+    if (error instanceof Error && (error.message === 'RATE_LIMIT' || error.message.includes('404'))) {
+      log(`Primary model failed, trying fallback: ${FALLBACK_MODEL}`);
       
-      const fallbackResponse = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://website-to-skill.dev',
-          'X-Title': 'Website to Skill Generator'
-        },
-        body: JSON.stringify({
-          model: FALLBACK_MODEL,
-          messages: [
-            { role: 'system', content: systemContent },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.3
-        })
-      });
-      
-      if (!fallbackResponse.ok) {
-        throw new Error(`Fallback model error: ${fallbackResponse.status}`);
+      try {
+        const fallbackResponse = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://website-to-skill.dev',
+            'X-Title': 'Website to Skill Generator'
+          },
+          body: JSON.stringify({
+            model: FALLBACK_MODEL,
+            messages: [
+              { role: 'system', content: systemContent },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.3
+          })
+        });
+        
+        if (!fallbackResponse.ok) {
+          throw new Error(`Fallback model error: ${fallbackResponse.status}`);
+        }
+        
+        const result = await fallbackResponse.json();
+        log('Fallback model succeeded');
+        return result;
+      } catch (fallbackError) {
+        log(`Fallback failed, trying tertiary: ${TERTIARY_MODEL}`);
+        
+        const tertiaryResponse = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+            'HTTP-Referer': 'https://website-to-skill.dev',
+            'X-Title': 'Website to Skill Generator'
+          },
+          body: JSON.stringify({
+            model: TERTIARY_MODEL,
+            messages: [
+              { role: 'system', content: systemContent },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.3
+          })
+        });
+        
+        if (!tertiaryResponse.ok) {
+          throw new Error(`Tertiary model error: ${tertiaryResponse.status}`);
+        }
+        
+        const result = await tertiaryResponse.json();
+        log('Tertiary model succeeded');
+        return result;
       }
-      
-      const result = await fallbackResponse.json();
-      log('Fallback model succeeded');
-      return result;
     }
     throw error;
   }
