@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
 
 interface PageFile {
@@ -47,6 +47,11 @@ export default function Home() {
   const [agentColor, setAgentColor] = useState('#2563eb');
   const [humanColor, setHumanColor] = useState('#6b7280');
   const [accentColor, setAccentColor] = useState('#2563eb');
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,8 +91,7 @@ export default function Home() {
 
   const getScriptTag = () => {
     const domain = getSkillDomain();
-    const host = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-      ? 'http://localhost:3000' : 'https://widget.agenticwebsite.io';
+    const host = process.env.NEXT_PUBLIC_WIDGET_HOST || 'https://widget.agenticwebsite.io';
     return `<script src="${host}/widget/${domain}?agentColor=${encodeURIComponent(agentColor)}&humanColor=${encodeURIComponent(humanColor)}&accentColor=${encodeURIComponent(accentColor)}"></script>`;
   };
 
@@ -103,8 +107,7 @@ export default function Home() {
     setAccentColor(preset.accent);
   };
 
-  const widgetHost = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-    ? 'http://localhost:3000' : 'https://widget.agenticwebsite.io';
+  const widgetHost = process.env.NEXT_PUBLIC_WIDGET_HOST || 'https://widget.agenticwebsite.io';
 
   return (
     <div className="min-h-screen bg-white">
