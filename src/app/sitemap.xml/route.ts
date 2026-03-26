@@ -20,7 +20,7 @@ export async function GET() {
 `;
 
   // Add skill pages
-  websites.forEach(site => {
+  websites.forEach((site: { domain: string; updatedAt: Date }) => {
     sitemap += `  <url>
     <loc>${baseUrl}/skill/${site.domain}</loc>
     <lastmod>${site.updatedAt.toISOString().split('T')[0]}</lastmod>
