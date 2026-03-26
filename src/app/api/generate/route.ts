@@ -817,10 +817,10 @@ async function generateSkillMd(data: ScrapedData, baseUrl: string, mode: 'import
     }
   });
   
-  // Use actual hosted URL
+  // Use actual hosted URL - fix to use correct domain
   const HOSTED_URL = process.env.HOSTED_URL || 'https://agentic-websites.vercel.app/skill';
   
-  // Build file index table with hosted documentation URLs
+  // Build file index table with hosted documentation URLs - URLs without .md extension
   const fileIndexTable = hasPageFiles ? `
 ## Files Available
 
@@ -829,7 +829,8 @@ async function generateSkillMd(data: ScrapedData, baseUrl: string, mode: 'import
 | skill.md | This file — full overview | ${data.url} | ${HOSTED_URL}/${data.domainId}/skill.md |
 ${combinedPageFiles.map(p => {
     const websiteUrl = pageUrlMap[p.filename] || `${baseUrl}/${p.filename.replace('.md', '')}`;
-    return `| ${p.filename} | Page documentation | ${websiteUrl} | ${HOSTED_URL}/${data.domainId}/${p.filename} |`;
+    const fileSlug = p.filename.replace('.md', '');
+    return `| ${p.filename} | Page documentation | ${websiteUrl} | ${HOSTED_URL}/${data.domainId}/${fileSlug} |`;
   }).join('\n')}
 
 > **Agent:** Start here. Read this file first, then fetch specific pages as needed.

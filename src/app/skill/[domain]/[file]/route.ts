@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ domain: string; filename: string }> }
+  { params }: { params: Promise<{ domain: string; file: string }> }
 ) {
-  const { domain: rawDomain, filename } = await params;
+  const { domain: rawDomain, file } = await params;
   // Normalize domain: replace dots with dashes and remove www- prefix
   let domain = rawDomain.replace(/\./g, '-').replace(/^www-/, '');
   
@@ -31,7 +31,8 @@ export async function GET(
       });
     }
     
-    // Look for the page file in pageFiles array
+    // Look for the page file in pageFiles array - add .md extension to match
+    const filename = `${file}.md`;
     const pageFiles = website.pageFiles as Array<{ filename: string; content: string }> | null;
     
     if (!pageFiles || !Array.isArray(pageFiles)) {
