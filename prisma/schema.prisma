@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Website {
+  id        String   @id @default(uuid())
+  domain    String   @unique
+  url       String
+  skillMd   String   @map("skill_md")
+  skillJson Json     @map("skill_json")
+  pageFiles Json     @map("page_files")
+  stats     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("websites")
+}
+
+model PageView {
+  id        String   @id @default(uuid())
+  domain    String
+  userType  String   @map("user_type") // 'agent' or 'human'
+  userAgent String?  @map("user_agent")
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("page_views")
+  @@index([domain])
+}
