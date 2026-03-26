@@ -2,641 +2,702 @@
 
 import { useState, useEffect } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import {
+  Globe, Code2, Zap, CheckCircle, Copy, Check,
+  Menu, X, ChevronRight, Bot, User, ArrowRight,
+  Shield, BarChart3, Terminal, Loader2,
+} from 'lucide-react';
 
-interface PageFile {
-  filename: string;
-  content: string;
-}
-
+interface PageFile { filename: string; content: string; }
 interface ScrapedStats {
-  duration_ms: number;
-  title: string;
-  pages_scraped: number;
-  page_files_generated: number;
-  headings_count: number;
-  features_count: number;
-  code_examples_count: number;
-  install_commands_count: number;
-  missing_info: string[];
+  duration_ms: number; pages_scraped: number;
+  page_files_generated: number; missing_info: string[];
 }
-
 interface ResultData {
-  url: string;
-  skill_md: string;
-  page_files: PageFile[];
-  skill_json: any;
-  stats: ScrapedStats;
+  url: string; skill_md: string; page_files: PageFile[];
+  skill_json: any; stats: ScrapedStats;
 }
 
 const PRESET_COLORS = [
-  { name: 'Blue', agent: '#2563eb', human: '#6b7280', accent: '#2563eb' },
-  { name: 'Orange', agent: '#ea580c', human: '#737373', accent: '#ea580c' },
-  { name: 'Purple', agent: '#7c3aed', human: '#6b7280', accent: '#7c3aed' },
-  { name: 'Green', agent: '#059669', human: '#525252', accent: '#059669' },
+  { name: 'Stone', agent: '#1c1917', human: '#a8a29e', accent: '#1c1917' },
+  { name: 'Blue', agent: '#1e40af', human: '#93c5fd', accent: '#1e40af' },
+  { name: 'Orange', agent: '#c2410c', human: '#fdba74', accent: '#c2410c' },
+  { name: 'Green', agent: '#166534', human: '#86efac', accent: '#166534' },
+];
+
+const FEATURES = [
+  { icon: Zap, title: 'Instant setup', desc: 'Paste a URL, get a widget. No servers, no config.' },
+  { icon: Bot, title: 'Agent-compatible', desc: 'Structured skill.md that every AI agent can read.' },
+  { icon: Globe, title: 'Works everywhere', desc: 'SaaS, e-commerce, docs, marketing — any site.' },
+  { icon: Shield, title: 'Private by design', desc: 'Only public content is scraped. Backend untouched.' },
+  { icon: BarChart3, title: 'Scrape analytics', desc: 'See exactly what pages were scanned.' },
+  { icon: Code2, title: 'One script tag', desc: 'One line of HTML and you\'re live.' },
+];
+
+const LOADING_STEPS = [
+  { label: 'Connecting to site…', duration: 2000 },
+  { label: 'Crawling pages…', duration: 4000 },
+  { label: 'Analyzing content…', duration: 3000 },
+  { label: 'Building skill.md…', duration: 2000 },
+  { label: 'Generating widget…', duration: 1500 },
 ];
 
 export default function Home() {
   const [url, setUrl] = useState('');
   const [mode, setMode] = useState<'important' | 'all'>('important');
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [result, setResult] = useState<ResultData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [postGenStep, setPostGenStep] = useState(1);
+  const [step, setStep] = useState(1);
   const [copied, setCopied] = useState(false);
-  const [agentColor, setAgentColor] = useState('#2563eb');
-  const [humanColor, setHumanColor] = useState('#6b7280');
-  const [accentColor, setAccentColor] = useState('#2563eb');
-  const [isClient, setIsClient] = useState(false);
+  const [curlCopied, setCurlCopied] = useState(false);
+  const [agentColor, setAgentColor] = useState('#1c1917');
+  const [humanColor, setHumanColor] = useState('#a8a29e');
+  const [accentColor, setAccentColor] = useState('#1c1917');
+  const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Animate loading steps
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    if (!loading) { setLoadingStep(0); return; }
+    let stepIdx = 0;
+    const advance = () => {
+      if (stepIdx < LOADING_STEPS.length - 1) {
+        stepIdx++;
+        setLoadingStep(stepIdx);
+        setTimeout(advance, LOADING_STEPS[stepIdx].duration);
+      }
+    };
+    setTimeout(advance, LOADING_STEPS[0].duration);
+  }, [loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url) return;
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    setPostGenStep(1);
-
+    setLoading(true); setError(null); setResult(null); setStep(1); setLoadingStep(0);
     try {
-      const response = await fetch('/api/generate', {
+      const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, mode }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to generate');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate');
       setResult(data.data);
       setDialogOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const getDomain = () => {
-    if (!result) return 'agenticwebsite.io';
-    try {
-      return new URL(result.url).hostname.replace(/^www\./, '');
-    } catch {
-      return 'agenticwebsite.io';
-    }
+    if (!result) return 'your-site.com';
+    try { return new URL(result.url).hostname.replace(/^www\./, ''); }
+    catch { return 'your-site.com'; }
   };
-
   const getSkillDomain = () => getDomain().replace(/\./g, '-');
+  const widgetHost = process.env.NEXT_PUBLIC_WIDGET_HOST || 'https://agentic-websites.vercel.app';
 
-  const getScriptTag = () => {
-    const domain = getSkillDomain();
-    const host = process.env.NEXT_PUBLIC_WIDGET_HOST || 'https://widget.agenticwebsite.io';
-    return `<script src="${host}/widget/${domain}?agentColor=${encodeURIComponent(agentColor)}&humanColor=${encodeURIComponent(humanColor)}&accentColor=${encodeURIComponent(accentColor)}"></script>`;
-  };
+  const getScriptTag = () =>
+    `<script src="${widgetHost}/widget/${getSkillDomain()}?agentColor=${encodeURIComponent(agentColor)}&humanColor=${encodeURIComponent(humanColor)}&accentColor=${encodeURIComponent(accentColor)}"></script>`;
 
   const copyScript = () => {
     navigator.clipboard.writeText(getScriptTag());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   };
-
-  const applyPreset = (preset: typeof PRESET_COLORS[0]) => {
-    setAgentColor(preset.agent);
-    setHumanColor(preset.human);
-    setAccentColor(preset.accent);
+  const copyCurl = () => {
+    navigator.clipboard.writeText(`curl ${widgetHost}/skill/${getSkillDomain()}/skill.md`);
+    setCurlCopied(true); setTimeout(() => setCurlCopied(false), 2000);
   };
-
-  const widgetHost = process.env.NEXT_PUBLIC_WIDGET_HOST || 'https://widget.agenticwebsite.io';
+  const applyPreset = (p: typeof PRESET_COLORS[0]) => {
+    setAgentColor(p.agent); setHumanColor(p.human); setAccentColor(p.accent);
+  };
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-900 text-white font-bold text-lg">
-                A
+    <div className="min-h-screen bg-background">
+
+      {/* ─── NAV ─────────────────────────────────────── */}
+      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <div className="flex h-14 items-center justify-between">
+            <a href="/" className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-foreground">
+                <span className="text-[11px] font-bold text-background">A</span>
               </div>
-              <span className="text-xl font-bold text-gray-900">Agentic Website</span>
-            </div>
-            <div className="flex items-center gap-8">
-              <a href="#features" className="text-sm font-medium text-gray-600 hover:text-gray-900">Features</a>
-              <a href="#how-it-works" className="text-sm font-medium text-gray-600 hover:text-gray-900">How it works</a>
-              <a href="https://github.com" target="_blank" rel="noopener" className="text-sm font-medium text-gray-600 hover:text-gray-900">GitHub</a>
-            </div>
+              <span className="text-sm font-semibold tracking-tight">Agentic Website</span>
+            </a>
+
+            <nav className="hidden md:flex items-center gap-1">
+              <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
+                <a href="#how-it-works">How it works</a>
+              </Button>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
+                <a href="#features">Features</a>
+              </Button>
+              <div className="ml-3">
+                <Button size="sm" asChild>
+                  <a href="#get-started">Try it <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></a>
+                </Button>
+              </div>
+            </nav>
+
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
+              {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </Button>
           </div>
         </div>
-      </nav>
 
-      {/* Hero Section */}
-      <main className="pt-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center py-16 lg:py-24">
-            {/* Left Column - Content */}
-            <div className="max-w-xl">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900 tracking-tight leading-[1.1] mb-6">
+        {mobileOpen && (
+          <div className="md:hidden border-t bg-background px-4 py-3 flex flex-col gap-1">
+            <Button variant="ghost" size="sm" className="justify-start" asChild>
+              <a href="#how-it-works" onClick={() => setMobileOpen(false)}>How it works</a>
+            </Button>
+            <Button variant="ghost" size="sm" className="justify-start" asChild>
+              <a href="#features" onClick={() => setMobileOpen(false)}>Features</a>
+            </Button>
+            <Separator className="my-2" />
+            <Button size="sm" asChild>
+              <a href="#get-started" onClick={() => setMobileOpen(false)}>Try it</a>
+            </Button>
+          </div>
+        )}
+      </header>
+
+      <main>
+
+        {/* ─── HERO ──────────────────────────────────── */}
+        <section id="get-started" className="relative overflow-hidden">
+          <div className="absolute inset-0 dot-grid opacity-40 pointer-events-none" />
+          <div className="relative mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-28 lg:py-32">
+
+            <div className="max-w-2xl mx-auto text-center mb-12">
+              <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.1] mb-5">
                 Make your website
-                <span className="block text-blue-600">agent-ready</span>
+                <br />
+                <span className="text-muted-foreground">agent-ready.</span>
               </h1>
-              <p className="text-lg sm:text-xl text-gray-600 mb-8 leading-relaxed">
-                Transform any website into an AI-agent-compatible service. One script tag, zero configuration. Agents can now understand your business and help your customers.
+              <p className="text-muted-foreground text-base sm:text-lg leading-relaxed max-w-lg mx-auto">
+                Paste your URL. We generate a skill.md and a widget so any AI agent
+                can understand and interact with your site.
               </p>
-              
-              {/* URL Input Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <input
-                      type="url"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="https://your-website.com"
-                      disabled={loading}
-                      className="block w-full h-12 px-4 text-base text-gray-900 placeholder-gray-400 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={loading || !url}
-                    className="h-12 px-8 text-base font-semibold text-white bg-gray-900 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
-                  >
-                    {loading ? 'Generating...' : 'Generate Widget'}
-                  </button>
+            </div>
+
+            {/* Form */}
+            <div className="max-w-xl mx-auto mb-10">
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    type="url"
+                    value={url}
+                    onChange={e => setUrl(e.target.value)}
+                    placeholder="https://your-website.com"
+                    disabled={loading}
+                    className="h-11 flex-1 font-mono text-sm bg-white border-stone-300 shadow-sm placeholder:text-stone-400"
+                  />
+                  <Button type="submit" disabled={loading || !url} className="h-11 shrink-0 px-6 shadow-sm">
+                    {loading ? (
+                      <span className="flex items-center gap-2">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Generating…
+                      </span>
+                    ) : (
+                      <>Generate <ArrowRight className="ml-1.5 h-3.5 w-3.5" /></>
+                    )}
+                  </Button>
                 </div>
-                
-                {error && (
-                  <div className="rounded-md bg-red-50 p-3">
-                    <p className="text-sm text-red-600">{error}</p>
-                  </div>
-                )}
-                
-                {/* Mode Selector */}
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
-                    <button
-                      type="button"
-                      onClick={() => setMode('important')}
-                      className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                        mode === 'important' 
-                          ? 'bg-white text-gray-900 shadow-sm' 
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      Smart (8 pages)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMode('all')}
-                      className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
-                        mode === 'all' 
-                          ? 'bg-white text-gray-900 shadow-sm' 
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      All pages (50 max)
-                    </button>
+
+                {/* Mode toggle */}
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-xs text-muted-foreground">Scan:</span>
+                  <div className="flex rounded-lg border bg-muted p-0.5 gap-0.5">
+                    {(['important', 'all'] as const).map(m => (
+                      <button
+                        key={m} type="button" onClick={() => setMode(m)}
+                        className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${mode === m
+                          ? 'bg-white text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                          }`}
+                      >
+                        {m === 'important' ? 'Smart — 8 pages' : 'All — up to 50'}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </form>
+
+              {/* Loading progress */}
+              {loading && (
+                <div className="mt-4 rounded-xl border bg-white p-4 shadow-sm animate-fade-in-up">
+                  <div className="space-y-2.5">
+                    {LOADING_STEPS.map((s, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                          {i < loadingStep ? (
+                            <CheckCircle className="h-4 w-4 text-stone-600" />
+                          ) : i === loadingStep ? (
+                            <Loader2 className="h-4 w-4 text-foreground animate-spin" />
+                          ) : (
+                            <div className="h-2 w-2 rounded-full bg-stone-200" />
+                          )}
+                        </div>
+                        <span className={`text-sm ${i <= loadingStep ? 'text-foreground' : 'text-stone-300'
+                          }`}>
+                          {s.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Error */}
+              {error && (
+                <div className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+                  <X className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                  <p className="text-sm text-destructive">{error}</p>
+                </div>
+              )}
             </div>
 
-            {/* Right Column - Preview */}
-            <div className="relative">
-              <div className="bg-gray-50 rounded-2xl border border-gray-200 p-6 lg:p-8">
-                {/* Window Controls */}
-                <div className="flex items-center justify-between mb-6">
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Widget Preview</span>
+            {/* Widget Preview */}
+            <div className="max-w-2xl mx-auto">
+              <div className="rounded-2xl border bg-white overflow-hidden shadow-lg shadow-stone-200/50">
+                {/* Browser chrome */}
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-stone-50/80">
                   <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                    <div className="w-2.5 h-2.5 rounded-full bg-stone-300" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-stone-300" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-stone-300" />
+                  </div>
+                  <div className="flex-1 ml-2">
+                    <div className="h-6 max-w-[180px] rounded-md bg-white border flex items-center px-2.5 gap-1.5">
+                      <Globe className="h-2.5 w-2.5 text-stone-400" />
+                      <span className="font-mono text-[10px] text-stone-400">your-site.com</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Preview Cards Container */}
-                <div className="space-y-4">
-                  {/* Agent Card */}
-                  <div className="bg-white rounded-xl border-2 border-blue-500 shadow-sm overflow-hidden">
-                    <div className="p-5">
-                      {/* Card Header */}
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="text-2xl">🤖</span>
-                        <h3 className="text-lg font-bold text-gray-900">I'm an Agent</h3>
+                {/* Two cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-5">
+
+                  {/* Agent card */}
+                  <div className="rounded-xl border-2 border-foreground bg-white flex flex-col overflow-hidden">
+                    <div className="bg-foreground px-4 py-3 flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-white" />
                       </div>
-                      
-                      {/* Curl Command Box */}
-                      <div className="bg-blue-50 rounded-lg p-4 mb-4 border-l-4 border-blue-500">
-                        <p className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-2">Add This Capability: Read this file</p>
-                        <code className="block text-xs font-mono text-gray-800 bg-white rounded px-3 py-2 break-all">
-                          curl {widgetHost}/skill/agentic-website/skill.md
+                      <span className="text-sm font-semibold text-white">I&apos;m an Agent</span>
+                    </div>
+                    <div className="p-4 flex flex-col gap-3 flex-1">
+                      <div className="rounded-lg bg-stone-50 border p-3">
+                        <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground mb-1">
+                          Capability
+                        </p>
+                        <code className="text-[11px] font-mono text-foreground break-all leading-relaxed">
+                          curl {widgetHost}/skill/<wbr />your-site/skill.md
                         </code>
                       </div>
-                      
-                      {/* Description */}
-                      <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-                        Add Agentic Website to your capabilities. Read skill.md for complete integration instructions.
-                      </p>
-                      
-                      {/* Steps */}
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">1</div>
-                          <span className="text-sm text-gray-700">Read skill.md</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">2</div>
-                          <span className="text-sm text-gray-700">Follow the integration guide</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">3</div>
-                          <span className="text-sm text-gray-700">Start helping users</span>
-                        </div>
+                      <div className="space-y-2">
+                        {['Read skill.md', 'Follow the guide', 'Help users'].map((s, i) => (
+                          <div key={i} className="flex items-center gap-2.5">
+                            <div className="w-5 h-5 rounded-full bg-foreground flex items-center justify-center text-background text-[10px] font-bold shrink-0">
+                              {i + 1}
+                            </div>
+                            <span className="text-xs text-muted-foreground">{s}</span>
+                          </div>
+                        ))}
                       </div>
-                      
-                      {/* CTA Button */}
-                      <button className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
-                        Read skill.md Now →
+                    </div>
+                    <div className="px-4 pb-4">
+                      <button className="w-full py-2.5 rounded-lg text-xs font-semibold text-white bg-foreground hover:opacity-90 transition-opacity">
+                        Read skill.md →
                       </button>
                     </div>
                   </div>
 
-                  {/* Human Card */}
-                  <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="p-5">
-                      {/* Card Header */}
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="text-2xl">👤</span>
-                        <h3 className="text-lg font-bold text-gray-900">I'm a Human</h3>
+                  {/* Human card */}
+                  <div className="rounded-xl border bg-white flex flex-col overflow-hidden">
+                    <div className="bg-stone-50 px-4 py-3 flex items-center gap-2.5 border-b">
+                      <div className="w-7 h-7 rounded-lg bg-white border flex items-center justify-center">
+                        <User className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      
-                      {/* Description */}
-                      <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-                        Send your AI agent to Agentic Website so they can read the skill.md and help you with this service.
+                      <span className="text-sm font-semibold">I&apos;m a Human</span>
+                    </div>
+                    <div className="p-4 flex flex-col gap-3 flex-1">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Send your AI assistant here. It&apos;ll read skill.md and help you
+                        set up AI compatibility for your site.
                       </p>
-                      
-                      {/* Steps */}
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-500 text-white flex items-center justify-center text-xs font-bold">1</div>
-                          <span className="text-sm text-gray-700">Send this to your agent</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-500 text-white flex items-center justify-center text-xs font-bold">2</div>
-                          <span className="text-sm text-gray-700">They read skill.md & integrate</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-500 text-white flex items-center justify-center text-xs font-bold">3</div>
-                          <span className="text-sm text-gray-700">Start getting help</span>
-                        </div>
+                      <div className="space-y-2">
+                        {['Send this to your agent', 'They read & integrate', 'You get help instantly'].map((s, i) => (
+                          <div key={i} className="flex items-center gap-2.5">
+                            <div className="w-5 h-5 rounded-full bg-stone-200 flex items-center justify-center text-muted-foreground text-[10px] font-bold shrink-0">
+                              {i + 1}
+                            </div>
+                            <span className="text-xs text-muted-foreground">{s}</span>
+                          </div>
+                        ))}
                       </div>
-                      
-                      {/* CTA Button */}
-                      <button className="w-full py-2.5 border-2 border-gray-900 text-gray-900 rounded-lg text-sm font-semibold hover:bg-gray-900 hover:text-white transition-colors">
-                        Copy Link →
+                    </div>
+                    <div className="px-4 pb-4">
+                      <button className="w-full py-2.5 rounded-lg border-2 border-foreground text-xs font-semibold text-foreground hover:bg-foreground hover:text-background transition-all">
+                        Copy link →
                       </button>
                     </div>
                   </div>
                 </div>
               </div>
+              <p className="text-center text-xs text-muted-foreground mt-3">
+                ↑ This is exactly how the widget appears on your site.
+              </p>
+            </div>
+
+          </div>
+        </section>
+
+        {/* ─── HOW IT WORKS ──────────────────────────── */}
+        <section id="how-it-works" className="border-y bg-white">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-24">
+            <div className="mb-12">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e8590c] mb-3">How it works</p>
+              <h2 className="text-3xl font-bold tracking-tight">Three steps, sixty seconds.</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
+              {[
+                { n: '01', icon: Globe, t: 'Enter your URL', d: 'Paste any public website URL. We crawl and analyze your pages automatically.' },
+                { n: '02', icon: Terminal, t: 'Generate skill.md', d: 'We build a machine-readable doc describing your product, features, and API for agents.' },
+                { n: '03', icon: Code2, t: 'Add one script tag', d: 'Copy one line of HTML. AI agents can now discover and interact with your site.' },
+              ].map(({ n, t, d, icon: Icon }, i) => (
+                <div key={n} className={`p-8 ${i < 2 ? 'md:border-r' : ''}`}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-stone-100 flex items-center justify-center">
+                      <Icon className="h-5 w-5 text-foreground" />
+                    </div>
+                    <span className="text-xs font-mono text-stone-400">{n}</span>
+                  </div>
+                  <h3 className="text-base font-semibold mb-2">{t}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{d}</p>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* ─── FEATURES ──────────────────────────────── */}
+        <section id="features" className="border-b">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-24">
+            <div className="mb-12">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#e8590c] mb-3">Features</p>
+              <h2 className="text-3xl font-bold tracking-tight">Everything you need.</h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-border rounded-xl overflow-hidden border">
+              {FEATURES.map(({ icon: Icon, title, desc }) => (
+                <div key={title} className="bg-white p-6 hover:bg-stone-50/80 transition-colors group">
+                  <div className="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center mb-4 group-hover:bg-stone-200 transition-colors">
+                    <Icon className="h-4 w-4 text-foreground" />
+                  </div>
+                  <h3 className="text-sm font-semibold mb-1.5">{title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── CTA ───────────────────────────────────── */}
+        <section className="bg-foreground">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 py-14 sm:py-16">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+              <div>
+                <h2 className="text-2xl font-bold text-background mb-1.5">Ready to go agent-ready?</h2>
+                <p className="text-background/40 text-sm">Takes sixty seconds. Free.</p>
+              </div>
+              <Button variant="secondary" className="shrink-0" asChild>
+                <a href="#get-started">Try it now <ArrowRight className="ml-1.5 h-4 w-4" /></a>
+              </Button>
+            </div>
+          </div>
+        </section>
       </main>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-gray-50">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">How it works</h2>
-            <p className="text-lg text-gray-600">Three simple steps to make your website accessible to AI agents</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
-            {/* Step 1 */}
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center text-2xl font-bold text-white mx-auto mb-6">
-                1
+      {/* ─── FOOTER ──────────────────────────────────── */}
+      <footer className="border-t bg-stone-50/50">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded bg-foreground">
+                <span className="text-[10px] font-bold text-background">A</span>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Enter your URL</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Paste your website URL. We automatically analyze your site structure, content, and features.
-              </p>
+              <span className="text-sm font-medium">Agentic Website</span>
             </div>
-            
-            {/* Step 2 */}
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center text-2xl font-bold text-white mx-auto mb-6">
-                2
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Generate skill.md</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Our AI analyzes your site and creates comprehensive documentation that agents can understand.
-              </p>
-            </div>
-            
-            {/* Step 3 */}
-            <div className="text-center">
-              <div className="w-16 h-16 bg-gray-900 rounded-2xl flex items-center justify-center text-2xl font-bold text-white mx-auto mb-6">
-                3
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Add one line</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Copy the script tag to your site. Done. AI agents can now understand and interact with your service.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-200 py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 text-white font-bold">
-                A
-              </div>
-              <span className="text-lg font-bold text-gray-900">Agentic Website</span>
-            </div>
-            <p className="text-sm text-gray-500">© 2025 Agentic Website. Make any site agent-ready.</p>
+            <p className="text-xs text-muted-foreground">© 2025 Agentic Website</p>
           </div>
         </div>
       </footer>
 
-      {/* Dialog */}
+      {/* ─── DIALOG ──────────────────────────────────── */}
       <Dialog.Root open={dialogOpen} onOpenChange={setDialogOpen}>
         <Dialog.Portal>
-          <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" />
-          <Dialog.Popup className="fixed inset-4 z-50 flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl md:inset-8 lg:inset-12">
-            {result && (
-              <>
-                {/* Dialog Header */}
-                <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 bg-gray-50">
-                  <div className="flex items-center gap-4">
-                    <Dialog.Title className="text-lg font-bold text-gray-900">
-                      {postGenStep === 1 && 'Widget Generated!'}
-                      {postGenStep === 2 && 'Customize Colors'}
-                      {postGenStep === 3 && 'Install Widget'}
-                    </Dialog.Title>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3].map((step) => (
-                        <div
-                          key={step}
-                          className={`h-2 rounded-full transition-all ${
-                            postGenStep === step ? 'bg-gray-900 w-6' : postGenStep > step ? 'bg-green-500 w-2' : 'bg-gray-300 w-2'
-                          }`}
-                        />
-                      ))}
+          <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+          <Dialog.Popup className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+            <div className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white rounded-xl border shadow-2xl overflow-hidden">
+              {result && (
+                <>
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 py-4 border-b bg-stone-50 flex-shrink-0">
+                    <div className="flex items-center gap-3">
+                      <Dialog.Title className="text-sm font-semibold">
+                        {step === 1 && '✓ Widget ready'}
+                        {step === 2 && 'Customize colors'}
+                        {step === 3 && 'Install widget'}
+                      </Dialog.Title>
+                      <div className="flex gap-1">
+                        {[1, 2, 3].map(s => (
+                          <div key={s} className={`h-1 rounded-full transition-all duration-300 ${step === s ? 'w-6 bg-foreground' : step > s ? 'w-3 bg-foreground/40' : 'w-3 bg-stone-200'
+                            }`} />
+                        ))}
+                      </div>
                     </div>
+                    <Dialog.Close className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+                      <X className="h-4 w-4" />
+                    </Dialog.Close>
                   </div>
-                  <Dialog.Close className="rounded-lg bg-white border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                    Close
-                  </Dialog.Close>
-                </div>
 
-                {/* Dialog Content */}
-                <div className="flex-1 overflow-auto p-6 lg:p-8">
-                  {/* Step 1: Preview */}
-                  {postGenStep === 1 && (
-                    <div className="max-w-4xl mx-auto">
-                      <div className="text-center mb-8">
-                        <div className="inline-flex items-center gap-2 rounded-full bg-green-100 px-4 py-2 text-sm font-semibold text-green-800 mb-4">
-                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Successfully analyzed {result.stats.pages_scraped} pages in {result.stats.duration_ms}ms
-                        </div>
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Your widget is ready</h3>
-                        <p className="text-gray-600">Preview your widget below, then customize colors and install</p>
-                      </div>
+                  <div className="flex-1 overflow-y-auto p-5 space-y-5">
 
-                      {/* Preview Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        {/* Agent Card */}
-                        <div className="bg-white rounded-xl border-2 shadow-sm overflow-hidden" style={{ borderColor: agentColor }}>
-                          <div className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                              <span className="text-2xl">🤖</span>
-                              <h4 className="text-lg font-bold text-gray-900">I'm an Agent</h4>
+                    {/* S1: preview */}
+                    {step === 1 && (
+                      <>
+                        {/* Success banner */}
+                        <div className="rounded-xl border bg-stone-50 p-4">
+                          <div className="flex items-center gap-2.5 mb-3">
+                            <div className="w-8 h-8 rounded-full bg-foreground flex items-center justify-center">
+                              <Check className="h-4 w-4 text-background" />
                             </div>
-                            
-                            <div className="rounded-lg p-4 mb-4" style={{ backgroundColor: `${agentColor}10`, borderLeft: `4px solid ${agentColor}` }}>
-                              <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: agentColor }}>Add This Capability</p>
-                              <code className="block text-xs font-mono text-gray-800 bg-white rounded px-3 py-2 break-all border" style={{ borderColor: `${agentColor}30` }}>
-                                curl {widgetHost}/skill/{getSkillDomain()}/skill.md
-                              </code>
+                            <div>
+                              <p className="text-sm font-semibold">Widget generated successfully</p>
+                              <p className="text-xs text-muted-foreground">for {getDomain()}</p>
                             </div>
-                            
-                            <p className="text-sm text-gray-600 mb-4">Add {getDomain()} to your capabilities. Read skill.md for integration instructions.</p>
-                            
-                            <button className="w-full py-2.5 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity" style={{ backgroundColor: accentColor }}>
-                              Read skill.md Now →
-                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white border px-2.5 py-1 text-xs font-medium text-foreground">
+                              <Globe className="h-3 w-3 text-muted-foreground" />
+                              {result.stats.pages_scraped} pages
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white border px-2.5 py-1 text-xs font-medium text-foreground">
+                              <Zap className="h-3 w-3 text-muted-foreground" />
+                              {result.stats.duration_ms}ms
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-white border px-2.5 py-1 text-xs font-medium text-foreground">
+                              <Code2 className="h-3 w-3 text-muted-foreground" />
+                              {result.stats.page_files_generated} files
+                            </span>
                           </div>
                         </div>
 
-                        {/* Human Card */}
-                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                          <div className="p-6">
-                            <div className="flex items-center gap-3 mb-4">
-                              <span className="text-2xl">👤</span>
-                              <h4 className="text-lg font-bold text-gray-900">I'm a Human</h4>
-                            </div>
-                            
-                            <p className="text-sm text-gray-600 mb-4">Send your AI agent to {getDomain()} so they can read the skill.md and help you.</p>
-                            
-                            <button className="w-full py-2.5 border-2 border-gray-900 text-gray-900 rounded-lg text-sm font-semibold hover:bg-gray-900 hover:text-white transition-colors">
-                              Copy Link →
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Widget preview</p>
 
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => setPostGenStep(2)}
-                          className="px-8 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors"
-                        >
-                          Next: Customize Colors →
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 2: Customize */}
-                  {postGenStep === 2 && (
-                    <div className="max-w-4xl mx-auto">
-                      <div className="mb-8">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Choose your colors</h3>
-                        <p className="text-gray-600">Select a preset or customize individual colors</p>
-                      </div>
-
-                      {/* Color Presets */}
-                      <div className="mb-8">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-4">Quick Presets</h4>
-                        <div className="flex flex-wrap gap-3">
-                          {PRESET_COLORS.map((preset) => (
-                            <button
-                              key={preset.name}
-                              onClick={() => applyPreset(preset)}
-                              className="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 hover:border-gray-400 transition-colors"
-                            >
-                              <div className="flex -space-x-1">
-                                <div className="w-4 h-4 rounded-full border border-white" style={{ backgroundColor: preset.agent }} />
-                                <div className="w-4 h-4 rounded-full border border-white" style={{ backgroundColor: preset.human }} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {/* Agent card */}
+                          <div className="rounded-2xl overflow-hidden shadow-md border" style={{ borderColor: agentColor }}>
+                            <div className="px-5 py-4 flex items-center gap-3" style={{ backgroundColor: agentColor }}>
+                              <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+                                <Bot className="h-5 w-5 text-white" />
                               </div>
-                              <span className="text-sm font-semibold text-gray-700">{preset.name}</span>
-                            </button>
+                              <div>
+                                <span className="text-sm font-bold text-white block">I&apos;m an Agent</span>
+                                <span className="text-[11px] text-white/60">AI assistant</span>
+                              </div>
+                            </div>
+                            <div className="bg-white p-4 space-y-3">
+                              <div className="rounded-xl bg-stone-50 border p-3">
+                                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1.5">Add this capability</p>
+                                <code className="text-[11px] font-mono text-foreground break-all leading-relaxed block">
+                                  curl {widgetHost}/skill/{getSkillDomain()}/skill.md
+                                </code>
+                              </div>
+                              <div className="space-y-2">
+                                {['Read skill.md', 'Follow the guide', 'Help users'].map((s, i) => (
+                                  <div key={i} className="flex items-center gap-2.5">
+                                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ backgroundColor: agentColor }}>
+                                      {i + 1}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">{s}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="bg-white px-4 pb-4">
+                              <button
+                                onClick={copyCurl}
+                                className="w-full py-3 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                                style={{ backgroundColor: agentColor }}
+                              >
+                                {curlCopied ? <><Check className="h-4 w-4" /> Copied!</> : <>Copy curl command <ArrowRight className="h-3.5 w-3.5" /></>}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Human card */}
+                          <div className="rounded-2xl overflow-hidden shadow-md border">
+                            <div className="px-5 py-4 flex items-center gap-3 bg-stone-100 border-b">
+                              <div className="w-9 h-9 rounded-xl bg-white border flex items-center justify-center">
+                                <User className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <span className="text-sm font-bold text-foreground block">I&apos;m a Human</span>
+                                <span className="text-[11px] text-muted-foreground">Site visitor</span>
+                              </div>
+                            </div>
+                            <div className="bg-white p-4 space-y-3">
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                Send your AI assistant to{' '}
+                                <span className="font-medium text-foreground">{getDomain()}</span>.
+                                It&apos;ll read skill.md and help you with this service.
+                              </p>
+                              <div className="space-y-2">
+                                {['Send this to your agent', 'They read & integrate', 'You get help instantly'].map((s, i) => (
+                                  <div key={i} className="flex items-center gap-2.5">
+                                    <div className="w-5 h-5 rounded-full bg-stone-200 flex items-center justify-center text-stone-500 text-[10px] font-bold shrink-0">
+                                      {i + 1}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">{s}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="bg-white px-4 pb-4">
+                              <button className="w-full py-3 rounded-xl border-2 border-foreground text-sm font-semibold text-foreground hover:bg-foreground hover:text-background transition-all">
+                                Copy link →
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                          <Button size="sm" onClick={() => setStep(2)}>
+                            Customize colors <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+
+                    {/* S2: colors */}
+                    {step === 2 && (
+                      <>
+                        <p className="text-sm text-muted-foreground">Pick a preset or customize to match your brand.</p>
+
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground mb-2.5">Presets</p>
+                          <div className="flex flex-wrap gap-2">
+                            {PRESET_COLORS.map(p => (
+                              <button
+                                key={p.name} onClick={() => applyPreset(p)}
+                                className="flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium hover:bg-stone-50 transition-colors"
+                              >
+                                <span className="flex gap-1">
+                                  <span className="w-3.5 h-3.5 rounded-full border" style={{ background: p.agent }} />
+                                  <span className="w-3.5 h-3.5 rounded-full border" style={{ background: p.human }} />
+                                </span>
+                                {p.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {[
+                            { label: 'Agent card', val: agentColor, set: setAgentColor },
+                            { label: 'Human badge', val: humanColor, set: setHumanColor },
+                            { label: 'Button', val: accentColor, set: setAccentColor },
+                          ].map(({ label, val, set }) => (
+                            <div key={label}>
+                              <label className="text-xs font-medium text-muted-foreground block mb-2">{label}</label>
+                              <div className="flex items-center gap-2">
+                                <input type="color" value={val} onChange={e => set(e.target.value)}
+                                  className="h-8 w-8 rounded border cursor-pointer p-0.5 bg-white" />
+                                <Input type="text" value={val} onChange={e => set(e.target.value)}
+                                  className="flex-1 font-mono text-xs h-8 min-w-0" />
+                              </div>
+                            </div>
                           ))}
                         </div>
-                      </div>
 
-                      {/* Custom Colors */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Agent Card Color</label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="color"
-                              value={agentColor}
-                              onChange={(e) => setAgentColor(e.target.value)}
-                              className="h-10 w-10 rounded-lg border border-gray-200 cursor-pointer"
-                            />
-                            <input
-                              type="text"
-                              value={agentColor}
-                              onChange={(e) => setAgentColor(e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
-                            />
+                        <div className="flex items-center justify-between">
+                          <Button variant="outline" size="sm" onClick={() => setStep(1)}>Back</Button>
+                          <Button size="sm" onClick={() => setStep(3)}>
+                            Get install code <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+
+                    {/* S3: install */}
+                    {step === 3 && (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          Add this before <code className="font-mono text-xs bg-stone-100 px-1.5 py-0.5 rounded">&lt;/body&gt;</code> in your HTML.
+                        </p>
+
+                        <div className="rounded-xl border overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-2.5 border-b bg-stone-50">
+                            <div className="flex items-center gap-2">
+                              <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-xs font-medium text-muted-foreground">HTML</span>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={copyScript} className="h-7 text-xs">
+                              {copied
+                                ? <><Check className="h-3 w-3 mr-1" />Copied</>
+                                : <><Copy className="h-3 w-3 mr-1" />Copy</>}
+                            </Button>
+                          </div>
+                          <div className="p-4 bg-white">
+                            <code className="text-xs font-mono text-foreground break-all leading-relaxed">
+                              {getScriptTag()}
+                            </code>
                           </div>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Human Steps Color</label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="color"
-                              value={humanColor}
-                              onChange={(e) => setHumanColor(e.target.value)}
-                              className="h-10 w-10 rounded-lg border border-gray-200 cursor-pointer"
-                            />
-                            <input
-                              type="text"
-                              value={humanColor}
-                              onChange={(e) => setHumanColor(e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
-                            />
-                          </div>
+                        <div className="space-y-3">
+                          {[
+                            { n: '1', t: 'Copy the code', d: 'Grab your personalized script tag.' },
+                            { n: '2', t: 'Paste into your page', d: 'Before </body> — any CMS, framework, or plain HTML.' },
+                            { n: '3', t: "You're live", d: 'AI agents can now read your skill.md and interact with your site.' },
+                          ].map(({ n, t, d }) => (
+                            <div key={n} className="flex gap-3 items-start">
+                              <div className="w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                                {n}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{t}</p>
+                                <p className="text-xs text-muted-foreground">{d}</p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Button Accent</label>
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="color"
-                              value={accentColor}
-                              onChange={(e) => setAccentColor(e.target.value)}
-                              className="h-10 w-10 rounded-lg border border-gray-200 cursor-pointer"
-                            />
-                            <input
-                              type="text"
-                              value={accentColor}
-                              onChange={(e) => setAccentColor(e.target.value)}
-                              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
-                            />
-                          </div>
+                        <div className="flex items-center justify-between">
+                          <Button variant="outline" size="sm" onClick={() => setStep(2)}>Back</Button>
+                          <Button size="sm" onClick={() => setDialogOpen(false)}>
+                            <Check className="mr-1.5 h-3.5 w-3.5" /> Done
+                          </Button>
                         </div>
-                      </div>
-
-                      <div className="flex justify-between">
-                        <button
-                          onClick={() => setPostGenStep(1)}
-                          className="px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
-                        >
-                          ← Back
-                        </button>
-                        <button
-                          onClick={() => setPostGenStep(3)}
-                          className="px-8 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors"
-                        >
-                          Next: Get Code →
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Step 3: Install */}
-                  {postGenStep === 3 && (
-                    <div className="max-w-3xl mx-auto">
-                      <div className="mb-8">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-2">Install your widget</h3>
-                        <p className="text-gray-600">Copy this script tag and paste it into your website's HTML</p>
-                      </div>
-
-                      {/* Script Tag */}
-                      <div className="rounded-xl border border-gray-200 bg-gray-900 p-6 mb-8">
-                        <div className="flex items-center justify-between mb-4">
-                          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Your Script Tag</span>
-                          <button
-                            onClick={copyScript}
-                            className="text-xs text-gray-400 hover:text-white transition-colors"
-                          >
-                            {copied ? '✓ Copied!' : 'Copy'}
-                          </button>
-                        </div>
-                        <code className="block text-sm font-mono text-gray-300 break-all">
-                          {getScriptTag()}
-                        </code>
-                      </div>
-
-                      {/* Installation Steps */}
-                      <div className="space-y-4 mb-8">
-                        <div className="flex gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-sm">1</div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-1">Copy the script tag</h4>
-                            <p className="text-sm text-gray-600">Click the copy button above to copy your unique widget code</p>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-sm">2</div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-1">Paste into your website</h4>
-                            <p className="text-sm text-gray-600">Add it to your HTML, preferably just before the closing &lt;/body&gt; tag</p>
-                          </div>
-                        </div>
-
-                        <div className="flex gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold text-sm">3</div>
-                          <div>
-                            <h4 className="font-semibold text-gray-900 mb-1">Done!</h4>
-                            <p className="text-sm text-gray-600">The widget will automatically appear. Agents can now read your skill.md</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-between">
-                        <button
-                          onClick={() => setPostGenStep(2)}
-                          className="px-6 py-3 border border-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
-                        >
-                          ← Back
-                        </button>
-                        <button
-                          onClick={() => setDialogOpen(false)}
-                          className="px-8 py-3 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-colors"
-                        >
-                          Done
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </Dialog.Popup>
         </Dialog.Portal>
       </Dialog.Root>

@@ -19,71 +19,30 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Agentic Website - Make Any Site Agent-Ready",
-  description: "Transform your website into an AI-agent-ready service. Generate skill.md files that help AI agents understand, navigate, and interact with your site.",
-  keywords: ["AI agents", "skill.md", "agent-ready", "AI integration", "website automation", "LLM tools"],
+  title: "Agentic Website — Make Any Site Agent-Ready",
+  description:
+    "Transform your website into an AI-agent-ready service. Generate skill.md files that help AI agents understand, navigate, and interact with your site.",
+  keywords: ["AI agents", "skill.md", "agent-ready", "AI integration", "website automation"],
   authors: [{ name: "Agentic Website" }],
   creator: "Agentic Website",
-  publisher: "Agentic Website",
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
-  },
+  robots: { index: true, follow: true },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: "https://agenticwebsite.io",
     siteName: "Agentic Website",
-    title: "Agentic Website - Make Any Site Agent-Ready",
-    description: "Transform your website into an AI-agent-ready service. Generate skill.md files that help AI agents understand and interact with your site.",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Agentic Website - Make your site agent-ready",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Agentic Website - Make Any Site Agent-Ready",
+    title: "Agentic Website — Make Any Site Agent-Ready",
     description: "Transform your website into an AI-agent-ready service.",
-    images: ["/og-image.png"],
-    creator: "@agenticwebsite",
+    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
-  alternates: {
-    canonical: "https://agenticwebsite.io",
-  },
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
-  manifest: "/site.webmanifest",
+  icons: { icon: "/favicon.ico", shortcut: "/favicon.ico" },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
-        <div className="root flex-1">
-          {children}
-        </div>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+      <body className="min-h-full flex flex-col antialiased bg-background text-foreground">
+        <div className="root flex-1">{children}</div>
       </body>
     </html>
   );
