@@ -817,8 +817,8 @@ async function generateSkillMd(data: ScrapedData, baseUrl: string, mode: 'import
     }
   });
   
-  // TODO: Replace with your actual hosting URL
-  const HOSTED_URL = process.env.HOSTED_URL || 'https://yourproduct.com/s';
+  // Use actual hosted URL
+  const HOSTED_URL = process.env.HOSTED_URL || 'https://agentic-websites.vercel.app/skill';
   
   // Build file index table with hosted documentation URLs
   const fileIndexTable = hasPageFiles ? `
