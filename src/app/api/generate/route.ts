@@ -66,17 +66,19 @@ function log(message: string) {
 // ─── FIRECRAWL SCRAPING (PRIMARY) ─────────────────────────────────────────────
 
 async function firecrawlScrape(url: string): Promise<{ markdown: string; html: string; success: boolean }> {
-  if (!FIRECRAWL_API_KEY) {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  log(`Firecrawl API key present: ${!!apiKey}, length: ${apiKey?.length || 0}`);
+  if (!apiKey) {
     log('No Firecrawl API key, skipping');
     return { markdown: '', html: '', success: false };
   }
 
   try {
     log(`Firecrawl scraping: ${url}`);
-    const response = await fetch(`${FIRECRAWL_BASE_URL}/scrape`, {
+    const response = await fetch(`https://api.firecrawl.dev/v1/scrape`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -107,14 +109,15 @@ async function firecrawlScrape(url: string): Promise<{ markdown: string; html: s
 }
 
 async function firecrawlMap(url: string): Promise<string[]> {
-  if (!FIRECRAWL_API_KEY) return [];
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) return [];
 
   try {
     log(`Firecrawl map: ${url}`);
-    const response = await fetch(`${FIRECRAWL_BASE_URL}/map`, {
+    const response = await fetch(`https://api.firecrawl.dev/v1/map`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
